@@ -5,8 +5,6 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/auth"
 	"golang.org/x/oauth2"
 	"os"
-	"os/signal"
-	"syscall"
 )
 
 // tokenSource ...
@@ -33,15 +31,8 @@ func tokenSource() oauth2.TokenSource {
 		check(err)
 		src = auth.RefreshTokenSource(token)
 	}
-	go func() {
-		c := make(chan os.Signal, 3)
-		signal.Notify(c, syscall.SIGTERM, syscall.SIGINT)
-		<-c
-
-		tok, _ := src.Token()
-		b, _ := json.Marshal(tok)
-		_ = os.WriteFile("token.tok", b, 0644)
-		os.Exit(0)
-	}()
+	tok, _ := src.Token()
+	b, _ := json.Marshal(tok)
+	_ = os.WriteFile("token.tok", b, 0644)
 	return src
 }

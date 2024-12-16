@@ -1,4 +1,4 @@
-module github.com/tedacmc/tedac
+module github.com/didntpot/tedac
 
 go 1.23.4
 

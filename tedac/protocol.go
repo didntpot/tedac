@@ -5,18 +5,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/df-mc/dragonfly/server/world"
+	"github.com/didntpot/tedac/tedac/chunk"
+	"github.com/didntpot/tedac/tedac/latestmappings"
+	"github.com/didntpot/tedac/tedac/legacychunk"
+	"github.com/didntpot/tedac/tedac/legacymappings"
+	"github.com/didntpot/tedac/tedac/legacyprotocol"
+	"github.com/didntpot/tedac/tedac/legacyprotocol/legacypacket"
 	"github.com/samber/lo"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"github.com/tedacmc/tedac/tedac/chunk"
-	"github.com/tedacmc/tedac/tedac/latestmappings"
-	"github.com/tedacmc/tedac/tedac/legacychunk"
-	"github.com/tedacmc/tedac/tedac/legacymappings"
-	"github.com/tedacmc/tedac/tedac/legacyprotocol"
-	"github.com/tedacmc/tedac/tedac/legacyprotocol/legacypacket"
 
-	_ "github.com/tedacmc/tedac/tedac/raknet"
+	_ "github.com/didntpot/tedac/tedac/raknet"
 )
 
 // Protocol represents the v1.12.0 Protocol implementation.
@@ -655,7 +655,7 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				TexturePackRequired: pk.TexturePackRequired,
 				BehaviourPacks:      pk.BehaviourPacks,
 				TexturePacks:        pk.TexturePacks,
-				Experimental:        len(pk.Experiments) > 0,
+				Experimental:        false,
 			},
 		}
 	case *packet.ResourcePackChunkData:

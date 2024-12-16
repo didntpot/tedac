@@ -1,11 +1,11 @@
 package legacypacket
 
 import (
+	"github.com/didntpot/tedac/tedac/legacymappings"
+	"github.com/didntpot/tedac/tedac/legacyprotocol"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"github.com/tedacmc/tedac/tedac/legacymappings"
-	"github.com/tedacmc/tedac/tedac/legacyprotocol"
 )
 
 // StartGame is sent by the server to send information about the world the player will be spawned in. It

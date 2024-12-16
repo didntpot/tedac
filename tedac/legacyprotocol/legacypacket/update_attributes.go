@@ -1,9 +1,9 @@
 package legacypacket
 
 import (
+	"github.com/didntpot/tedac/tedac/legacyprotocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"github.com/tedacmc/tedac/tedac/legacyprotocol"
 )
 
 // UpdateAttributes is sent by the server to update an amount of attributes of any entity in the world. These

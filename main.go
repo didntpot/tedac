@@ -18,8 +18,8 @@ func main() {
 	conf, err := goph.LoadConf()
 	if os.IsNotExist(err) {
 		_ = goph.SaveConf(ProxyInfo{
-			RemoteAddress: "127.0.0.1:19133",
-			LocalAddress:  "127.0.0.1:19132",
+			LocalAddress:  "127.0.0.1:19133",
+			RemoteAddress: "127.0.0.1:19132",
 		})
 	} else if err != nil {
 		log.Error("failed to initialise config: " + err.Error())

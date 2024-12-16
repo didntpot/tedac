@@ -1,10 +1,10 @@
 package legacypacket
 
 import (
+	"github.com/didntpot/tedac/tedac/legacyprotocol"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"github.com/tedacmc/tedac/tedac/legacyprotocol"
 )
 
 // AddItemActor is sent by the server to the client to make an item entity show up. It is one of the few

@@ -1,9 +1,9 @@
 package legacyprotocol
 
 import (
+	"github.com/didntpot/tedac/tedac/legacymappings"
 	"github.com/sandertv/gophertunnel/minecraft/nbt"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
-	"github.com/tedacmc/tedac/tedac/legacymappings"
 )
 
 // ItemStack represents an item instance/stack over network. It has a network ID and a metadata value that

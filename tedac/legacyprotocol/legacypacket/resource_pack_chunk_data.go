@@ -1,9 +1,9 @@
 package legacypacket
 
 import (
+	"github.com/didntpot/tedac/tedac/legacyprotocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"github.com/tedacmc/tedac/tedac/legacyprotocol"
 )
 
 // ResourcePackChunkData is sent to the client so that the client can download the resource pack. Each packet

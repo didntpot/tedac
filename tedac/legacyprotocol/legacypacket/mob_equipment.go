@@ -1,9 +1,9 @@
 package legacypacket
 
 import (
+	"github.com/didntpot/tedac/tedac/legacyprotocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"github.com/tedacmc/tedac/tedac/legacyprotocol"
 )
 
 // MobEquipment is sent by the client to the server and the server to the client to make the other side

@@ -1,11 +1,11 @@
 package legacypacket
 
 import (
+	"github.com/didntpot/tedac/tedac/legacyprotocol"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/google/uuid"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"github.com/tedacmc/tedac/tedac/legacyprotocol"
 )
 
 // AddPlayer is sent by the server to the client to make a player entity show up client-side. It is one of the

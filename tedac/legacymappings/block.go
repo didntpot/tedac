@@ -5,10 +5,10 @@ import (
 	_ "embed"
 	"encoding/json"
 	"github.com/df-mc/worldupgrader/blockupgrader"
+	"github.com/didntpot/tedac/tedac/latestmappings"
+	"github.com/didntpot/tedac/tedac/legacychunk"
 	"github.com/sandertv/gophertunnel/minecraft/nbt"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
-	"github.com/tedacmc/tedac/tedac/latestmappings"
-	"github.com/tedacmc/tedac/tedac/legacychunk"
 )
 
 var (

@@ -8,17 +8,18 @@ import (
 	"fmt"
 	"github.com/df-mc/atomic"
 	"github.com/df-mc/dragonfly/server/world"
+	"github.com/didntpot/tedac/tedac"
+	"github.com/didntpot/tedac/tedac/chunk"
+	"github.com/didntpot/tedac/tedac/latestmappings"
+	"github.com/didntpot/tedac/tedac/legacyprotocol/legacypacket"
 	"github.com/google/uuid"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/nbt"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sandertv/gophertunnel/minecraft/resource"
-	"github.com/tedacmc/tedac/tedac"
-	"github.com/tedacmc/tedac/tedac/chunk"
-	"github.com/tedacmc/tedac/tedac/latestmappings"
-	"github.com/tedacmc/tedac/tedac/legacyprotocol/legacypacket"
 	"golang.org/x/oauth2"
+	"log/slog"
 	"net"
 	"os"
 	"strconv"
@@ -30,24 +31,26 @@ import (
 type Tedac struct {
 	listener *minecraft.Listener
 
-	remoteAddress string
 	localAddress  string
+	remoteAddress string
 
 	src oauth2.TokenSource
 	ctx context.Context
+
+	log *slog.Logger
 
 	c chan interface{}
 }
 
 // NewTedac ...
 func NewTedac(localAddress string) *Tedac {
-	return &Tedac{localAddress: localAddress, src: tokenSource(), c: make(chan interface{})}
+	return &Tedac{localAddress: localAddress, src: tokenSource(), log: slog.Default(), c: make(chan interface{})}
 }
 
 // ProxyInfo ...
 type ProxyInfo struct {
-	RemoteAddress string
 	LocalAddress  string
+	RemoteAddress string
 }
 
 // ProxyingInfo ...
@@ -56,8 +59,8 @@ func (t *Tedac) ProxyingInfo() (ProxyInfo, error) {
 		return ProxyInfo{}, errors.New("no connection active")
 	}
 	return ProxyInfo{
-		RemoteAddress: t.remoteAddress,
 		LocalAddress:  t.localAddress,
+		RemoteAddress: t.remoteAddress,
 	}, nil
 }
 
@@ -165,14 +168,6 @@ func (t *Tedac) Connect(remoteAddress string) error {
 var (
 	// airRID is the runtime ID of the air block in the latest version of the game.
 	airRID, _ = latestmappings.StateToRuntimeID("minecraft:air", nil)
-	// defaultSkinResourcePatch holds the skin resource patch assigned to a player when they wear a custom skin.
-	defaultSkinResourcePatch = base64.StdEncoding.EncodeToString([]byte(`
-		{
-		   "geometry" : {
-		      "default" : "geometry.humanoid.custom"
-		   }
-		}
-	`))
 )
 
 // handleConn ...
@@ -180,7 +175,7 @@ func (t *Tedac) handleConn(conn *minecraft.Conn) {
 	clientData := conn.ClientData()
 	if _, ok := conn.Protocol().(tedac.Protocol); ok {
 		clientData.GameVersion = protocol.CurrentVersion
-		clientData.SkinResourcePatch = defaultSkinResourcePatch
+		clientData.DeviceOS = protocol.DeviceLinux
 		clientData.DeviceModel = "TEDAC CLIENT"
 
 		data, _ := base64.StdEncoding.DecodeString(clientData.SkinData)
@@ -202,7 +197,8 @@ func (t *Tedac) handleConn(conn *minecraft.Conn) {
 		ClientData:  clientData,
 	}.Dial("raknet", t.remoteAddress)
 	if err != nil {
-		panic(err)
+		t.log.Error("error while dialing: " + err.Error())
+		return
 	}
 
 	data := serverConn.GameData()
@@ -244,7 +240,7 @@ func (t *Tedac) handleConn(conn *minecraft.Conn) {
 
 	if oldMovementSystem {
 		go func() {
-			t := time.NewTicker(time.Second / 20)
+			t := time.NewTicker(time.Millisecond * 500 / 20)
 			defer t.Stop()
 
 			var tick uint64
@@ -298,7 +294,10 @@ func (t *Tedac) handleConn(conn *minecraft.Conn) {
 				if err != nil {
 					return
 				}
-				_ = serverConn.Flush()
+				_ = conn.WritePacket(&packet.NetworkChunkPublisherUpdate{ // cry about it
+					Position: protocol.BlockPos{int32(currentPos.X()), int32(currentPos.Y()), int32(currentPos.Z())},
+					Radius:   uint32(data.ChunkRadius) << 4,
+				})
 				tick++
 			}
 		}()
@@ -361,7 +360,6 @@ func (t *Tedac) handleConn(conn *minecraft.Conn) {
 				}
 				return
 			}
-			_ = serverConn.Flush()
 		}
 	}()
 	go func() {
@@ -456,7 +454,6 @@ func (t *Tedac) handleConn(conn *minecraft.Conn) {
 					SubChunkCount: uint32(len(pk.SubChunkEntries)),
 					RawPayload:    append([]byte(nil), chunkBuf.Bytes()...),
 				})
-				_ = conn.Flush()
 				continue
 			case *packet.LevelChunk:
 				if pk.SubChunkCount != protocol.SubChunkRequestModeLimitless && pk.SubChunkCount != protocol.SubChunkRequestModeLimited {
@@ -484,7 +481,6 @@ func (t *Tedac) handleConn(conn *minecraft.Conn) {
 					Position: protocol.SubChunkPos{pk.Position.X(), 0, pk.Position.Z()},
 					Offsets:  offsets,
 				})
-				_ = serverConn.Flush()
 				continue
 			case *packet.Transfer:
 				t.remoteAddress = fmt.Sprintf("%s:%d", pk.Address, pk.Port)
@@ -495,7 +491,6 @@ func (t *Tedac) handleConn(conn *minecraft.Conn) {
 			if err := conn.WritePacket(pk); err != nil {
 				return
 			}
-			_ = conn.Flush()
 		}
 	}()
 }

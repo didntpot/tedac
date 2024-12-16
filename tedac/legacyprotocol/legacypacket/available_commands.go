@@ -3,9 +3,9 @@ package legacypacket
 import (
 	"math"
 
+	"github.com/didntpot/tedac/tedac/legacyprotocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"github.com/tedacmc/tedac/tedac/legacyprotocol"
 )
 
 // AvailableCommands is sent by the server to send a list of all commands that the player is able to use on
