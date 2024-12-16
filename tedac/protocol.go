@@ -241,7 +241,7 @@ func (Protocol) ConvertToLatest(pk packet.Packet, _ *minecraft.Conn) []packet.Pa
 		return nil
 	}
 
-	if pk.ID() == 37 { // TODO: This is so fucking ugly why just why
+	if pk.ID() == 37 {
 		return nil
 	}
 	return []packet.Packet{pk}
@@ -305,7 +305,6 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 			},
 		}
 	case *packet.StartGame:
-		// TODO: Adjust our mappings to account for any possible custom blocks.
 		return []packet.Packet{
 			&legacypacket.StartGame{
 				EntityUniqueID:                 pk.EntityUniqueID,
@@ -358,7 +357,6 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 			},
 		}
 	case *packet.LevelChunk:
-		// TODO: Support other sub-chunk request modes.
 		buf := bytes.NewBuffer(pk.RawPayload)
 		oldFormat := conn.GameData().BaseGameVersion == "1.17.40"
 		c, err := chunk.NetworkDecode(latestAirRID, buf, int(pk.SubChunkCount), oldFormat, world.Overworld.Range())
@@ -733,7 +731,7 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 			},
 		}
 	case *packet.Animate:
-		if pk.ActionType > 4 { // TODO: This is also pretty fucking ugly
+		if pk.ActionType > 4 {
 			return []packet.Packet{}
 		}
 	}

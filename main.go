@@ -22,7 +22,7 @@ func main() {
 			LocalAddress:  "127.0.0.1:19132",
 		})
 	} else if err != nil {
-		log.Error("failed to connect to remote server: " + err.Error())
+		log.Error("failed to initialise config: " + err.Error())
 		return
 	}
 

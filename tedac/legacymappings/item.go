@@ -37,7 +37,7 @@ func ItemNameByID(id int16) (string, bool) {
 	if name == "minecraft:netherstar" {
 		name = "minecraft:nether_star"
 	}
-	// TODO: Properly handle item aliases.
+	// TODO: Properly handle item aliases (fuck you cadet).
 
 	return name, ok
 }
@@ -47,7 +47,7 @@ func ItemIDByName(name string) (int16, bool) {
 	if name == "minecraft:nether_star" {
 		name = "minecraft:netherstar"
 	}
-	// TODO: Properly handle item aliases.
+	// TODO: Properly handle item aliases (fuck you cadet).
 
 	id, ok := itemNamesToIDs[name]
 	if !ok {
