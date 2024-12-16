@@ -15,6 +15,7 @@ import (
 	"github.com/tedacmc/tedac/tedac/legacymappings"
 	"github.com/tedacmc/tedac/tedac/legacyprotocol"
 	"github.com/tedacmc/tedac/tedac/legacyprotocol/legacypacket"
+
 	_ "github.com/tedacmc/tedac/tedac/raknet"
 )
 
@@ -639,7 +640,7 @@ func (Protocol) ConvertFromLatest(pk packet.Packet, conn *minecraft.Conn) []pack
 				HasScripts:          pk.HasScripts,
 				TexturePacks: lo.Map(pk.TexturePacks, func(pack protocol.TexturePackInfo, _ int) legacyprotocol.ResourcePackInfo {
 					return legacyprotocol.ResourcePackInfo{
-						UUID:            pack.UUID,
+						UUID:            pack.UUID.String(),
 						Version:         pack.Version,
 						Size:            pack.Size,
 						ContentKey:      pack.ContentKey,

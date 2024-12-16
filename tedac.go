@@ -4,14 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/df-mc/atomic"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/google/uuid"
 	"github.com/sandertv/gophertunnel/minecraft"
-	"github.com/sandertv/gophertunnel/minecraft/auth"
 	"github.com/sandertv/gophertunnel/minecraft/nbt"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -20,21 +18,20 @@ import (
 	"github.com/tedacmc/tedac/tedac/chunk"
 	"github.com/tedacmc/tedac/tedac/latestmappings"
 	"github.com/tedacmc/tedac/tedac/legacyprotocol/legacypacket"
-	"github.com/wailsapp/wails/lib/renderer/webview"
 	"golang.org/x/oauth2"
 	"net"
 	"os"
-	"os/exec"
-	"runtime"
+	"strconv"
 	"sync"
 	"time"
 )
 
-// App ...
-type App struct {
-	listener      *minecraft.Listener
+// Tedac ...
+type Tedac struct {
+	listener *minecraft.Listener
+
 	remoteAddress string
-	localPort     uint16
+	localAddress  string
 
 	src oauth2.TokenSource
 	ctx context.Context
@@ -42,54 +39,53 @@ type App struct {
 	c chan interface{}
 }
 
-// NewApp creates a new App application struct.
-func NewApp() *App {
-	return &App{src: tokenSource(), c: make(chan interface{})}
+// NewTedac ...
+func NewTedac(localAddress string) *Tedac {
+	return &Tedac{localAddress: localAddress, src: tokenSource(), c: make(chan interface{})}
 }
 
 // ProxyInfo ...
 type ProxyInfo struct {
-	RemoteAddress string `json:"remote_address"`
-	LocalAddress  string `json:"local_address"`
+	RemoteAddress string
+	LocalAddress  string
 }
 
-// ProxyingInfo returns info about the current Tedac connection. If no connection is active, an error is returned.
-func (a *App) ProxyingInfo() (ProxyInfo, error) {
-	if a.listener == nil {
+// ProxyingInfo ...
+func (t *Tedac) ProxyingInfo() (ProxyInfo, error) {
+	if t.listener == nil {
 		return ProxyInfo{}, errors.New("no connection active")
 	}
 	return ProxyInfo{
-		RemoteAddress: a.remoteAddress,
-		LocalAddress:  fmt.Sprintf("127.0.0.1:%d", a.localPort),
+		RemoteAddress: t.remoteAddress,
+		LocalAddress:  t.localAddress,
 	}, nil
 }
 
-// Terminate terminates any existing Tedac connection.
-func (a *App) Terminate() {
-	if a.listener == nil {
-		return
-	}
-	a.c <- struct{}{}
-	_ = a.listener.Close()
+// LocalAddress ...
+func (t *Tedac) LocalAddress() string {
+	address, _, _ := net.SplitHostPort(t.localAddress)
+	return address
 }
 
-// Connect starts Tedac and connects to a remote server.
-func (a *App) Connect(address string) error {
-	temp, err := net.ResolveUDPAddr("udp", ":0")
-	if err != nil {
-		return err
-	}
-	l, err := net.ListenUDP("udp", temp)
-	if err != nil {
-		return err
-	}
+// LocalPort ...
+func (t *Tedac) LocalPort() uint16 {
+	_, str, _ := net.SplitHostPort(t.localAddress)
+	port, _ := strconv.Atoi(str)
+	return uint16(port)
+}
 
-	port := l.LocalAddr().(*net.UDPAddr).Port
-	if err = l.Close(); err != nil {
-		return err
+// Terminate ...
+func (t *Tedac) Terminate() {
+	if t.listener == nil {
+		return
 	}
+	t.c <- struct{}{}
+	_ = t.listener.Close()
+}
 
-	p, err := minecraft.NewForeignStatusProvider(address)
+// Connect ...
+func (t *Tedac) Connect(remoteAddress string) error {
+	p, err := minecraft.NewForeignStatusProvider(remoteAddress)
 	if err != nil {
 		return err
 	}
@@ -99,7 +95,7 @@ func (a *App) Connect(address string) error {
 
 	var cachedPackNames []string
 	conn, err := minecraft.Dialer{
-		TokenSource: a.src,
+		TokenSource: t.src,
 		DownloadResourcePack: func(id uuid.UUID, version string, _, _ int) bool {
 			if useCache {
 				name := fmt.Sprintf("%s_%s", id, version)
@@ -111,7 +107,7 @@ func (a *App) Connect(address string) error {
 			}
 			return true
 		},
-	}.Dial("raknet", address)
+	}.Dial("raknet", remoteAddress)
 	if err != nil {
 		return err
 	}
@@ -138,48 +134,32 @@ func (a *App) Connect(address string) error {
 		}
 	}
 
-	a.remoteAddress = address
-	a.localPort = uint16(port)
+	t.remoteAddress = remoteAddress
 
-	go a.startRPC()
+	go t.startRPC()
 
-	a.listener, err = minecraft.ListenConfig{
+	t.listener, err = minecraft.ListenConfig{
 		AllowInvalidPackets: true,
 		AllowUnknownPackets: true,
 
-		StatusProvider:    p,
+		StatusProvider: p,
+
 		ResourcePacks:     append(packs, cachedPacks...),
 		AcceptedProtocols: []minecraft.Protocol{tedac.Protocol{}},
-	}.Listen("raknet", fmt.Sprintf(":%d", port))
+	}.Listen("raknet", t.localAddress)
 	if err != nil {
 		return err
 	}
 	go func() {
 		for {
-			c, err := a.listener.Accept()
+			c, err := t.listener.Accept()
 			if err != nil {
 				break
 			}
-			go a.handleConn(c.(*minecraft.Conn))
+			go t.handleConn(c.(*minecraft.Conn))
 		}
 	}()
 	return nil
-}
-
-// CheckNetIsolation checks if a loopback exempt is in place to allow the hosting device to join the server. This is
-// only relevant on Windows.
-func (a *App) CheckNetIsolation() bool {
-	if runtime.GOOS != "windows" {
-		// Only an issue on Windows.
-		return true
-	}
-	data, _ := exec.Command("CheckNetIsolation", "LoopbackExempt", "-s", `-n="microsoft.minecraftuwp_8wekyb3d8bbwe"`).CombinedOutput()
-	return bytes.Contains(data, []byte("microsoft.minecraftuwp_8wekyb3d8bbwe"))
-}
-
-// startup is called when the app starts. The context is saved, so we can call the runtime methods.
-func (a *App) startup(ctx context.Context) {
-	a.ctx = ctx
 }
 
 var (
@@ -195,10 +175,10 @@ var (
 	`))
 )
 
-// handleConn handles a new incoming minecraft.Conn from the minecraft.Listener passed.
-func (a *App) handleConn(conn *minecraft.Conn) {
+// handleConn ...
+func (t *Tedac) handleConn(conn *minecraft.Conn) {
 	clientData := conn.ClientData()
-	if _, ok := conn.Protocol().(tedac.Protocol); ok { // TODO: Adjust this inside Protocol itself.
+	if _, ok := conn.Protocol().(tedac.Protocol); ok {
 		clientData.GameVersion = protocol.CurrentVersion
 		clientData.SkinResourcePatch = defaultSkinResourcePatch
 		clientData.DeviceModel = "TEDAC CLIENT"
@@ -218,9 +198,9 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 	}
 
 	serverConn, err := minecraft.Dialer{
-		TokenSource: a.src,
+		TokenSource: t.src,
 		ClientData:  clientData,
-	}.Dial("raknet", a.remoteAddress)
+	}.Dial("raknet", t.remoteAddress)
 	if err != nil {
 		panic(err)
 	}
@@ -243,7 +223,6 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 	}()
 	g.Wait()
 
-	// TODO: Component-ize the shit below.
 	rid := data.EntityRuntimeID
 	oldMovementSystem := data.PlayerMovementSettings.MovementType == protocol.PlayerMovementModeClient
 	if _, ok := conn.Protocol().(tedac.Protocol); ok {
@@ -275,33 +254,33 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 
 				currentYaw, currentPitch := yaw.Load(), pitch.Load()
 
-				inputs := uint64(0)
+				inputs := protocol.NewBitset(packet.PlayerAuthInputBitsetSize)
 				if startedSneaking.CompareAndSwap(true, false) {
-					inputs |= packet.InputFlagStartSneaking
+					inputs.Set(packet.InputFlagStartSneaking)
 				}
 				if stoppedSneaking.CompareAndSwap(true, false) {
-					inputs |= packet.InputFlagStopSneaking
+					inputs.Set(packet.InputFlagStopSneaking)
 				}
 				if startedSprinting.CompareAndSwap(true, false) {
-					inputs |= packet.InputFlagStartSprinting
+					inputs.Set(packet.InputFlagStartSprinting)
 				}
 				if stoppedSprinting.CompareAndSwap(true, false) {
-					inputs |= packet.InputFlagStopSprinting
+					inputs.Set(packet.InputFlagStopSprinting)
 				}
 				if startedGliding.CompareAndSwap(true, false) {
-					inputs |= packet.InputFlagStartGliding
+					inputs.Set(packet.InputFlagStartGliding)
 				}
 				if stoppedGliding.CompareAndSwap(true, false) {
-					inputs |= packet.InputFlagStopGliding
+					inputs.Set(packet.InputFlagStopGliding)
 				}
 				if startedSwimming.CompareAndSwap(true, false) {
-					inputs |= packet.InputFlagStartSwimming
+					inputs.Set(packet.InputFlagStartSwimming)
 				}
 				if stoppedSwimming.CompareAndSwap(true, false) {
-					inputs |= packet.InputFlagStopSwimming
+					inputs.Set(packet.InputFlagStopSwimming)
 				}
 				if startedJumping.CompareAndSwap(true, false) {
-					inputs |= packet.InputFlagJumping
+					inputs.Set(packet.InputFlagJumping)
 				}
 
 				err := serverConn.WritePacket(&packet.PlayerAuthInput{
@@ -325,7 +304,7 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 		}()
 	}
 	go func() {
-		defer a.listener.Disconnect(conn, "connection lost")
+		defer t.listener.Disconnect(conn, "connection lost")
 		defer serverConn.Close()
 		for {
 			pk, err := conn.ReadPacket()
@@ -378,7 +357,7 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 			if err := serverConn.WritePacket(pk); err != nil {
 				var disconnect minecraft.DisconnectError
 				if errors.As(errors.Unwrap(err), &disconnect) {
-					_ = a.listener.Disconnect(conn, disconnect.Error())
+					_ = t.listener.Disconnect(conn, disconnect.Error())
 				}
 				return
 			}
@@ -387,13 +366,13 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 	}()
 	go func() {
 		defer serverConn.Close()
-		defer a.listener.Disconnect(conn, "connection lost")
+		defer t.listener.Disconnect(conn, "connection lost")
 		for {
 			pk, err := serverConn.ReadPacket()
 			if err != nil {
 				var disconnect minecraft.DisconnectError
 				if errors.As(errors.Unwrap(err), &disconnect) {
-					_ = a.listener.Disconnect(conn, disconnect.Error())
+					_ = t.listener.Disconnect(conn, disconnect.Error())
 				}
 				return
 			}
@@ -508,10 +487,10 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 				_ = serverConn.Flush()
 				continue
 			case *packet.Transfer:
-				a.remoteAddress = fmt.Sprintf("%s:%d", pk.Address, pk.Port)
+				t.remoteAddress = fmt.Sprintf("%s:%d", pk.Address, pk.Port)
 
-				pk.Address = "127.0.0.1"
-				pk.Port = a.localPort
+				pk.Address = t.LocalAddress()
+				pk.Port = t.LocalPort()
 			}
 			if err := conn.WritePacket(pk); err != nil {
 				return
@@ -519,51 +498,4 @@ func (a *App) handleConn(conn *minecraft.Conn) {
 			_ = conn.Flush()
 		}
 	}()
-}
-
-// tokenSource returns a token source for using with a gophertunnel client. It either reads it from the
-// token.tok file if cached or requests logging in with a device code.
-func tokenSource() oauth2.TokenSource {
-	token := new(oauth2.Token)
-	tokenData, err := os.ReadFile("token.tok")
-	if err == nil {
-		_ = json.Unmarshal(tokenData, token)
-	} else {
-		token = requestToken()
-	}
-	src := auth.RefreshTokenSource(token)
-	_, err = src.Token()
-	if err != nil {
-		// The cached refresh token expired and can no longer be used to obtain a new token. We require the
-		// user to log in again and use that token instead.
-		src = auth.RefreshTokenSource(requestToken())
-	}
-	tok, _ := src.Token()
-	b, _ := json.Marshal(tok)
-	_ = os.WriteFile("token.tok", b, 0644)
-	return src
-}
-
-// requestToken opens a new WebView2 window and requests the user to log in. The token is returned if successful.
-func requestToken() *oauth2.Token {
-	resp, err := auth.StartDeviceAuth()
-	if err != nil {
-		panic(err)
-	}
-	view := webview.NewWebview(webview.Settings{
-		Title:  "Tedac Authentication",
-		URL:    "https://login.live.com/oauth20_remoteconnect.srf?lc=1033&otc=" + resp.UserCode,
-		Width:  500,
-		Height: 600,
-	})
-	view.Run()
-
-	t, err := auth.PollDeviceAuth(resp.DeviceCode)
-	if err != nil {
-		panic(err)
-	}
-	if t == nil {
-		panic(err)
-	}
-	return t
 }

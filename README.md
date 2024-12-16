@@ -1,2 +1,2 @@
 # tedac
-Gophertunnel library to support v1.12.0 multi-version.
+> fed up with wails, FUCK wails.

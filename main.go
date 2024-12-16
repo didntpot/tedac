@@ -1,32 +1,53 @@
 package main
 
 import (
-	"embed"
-
-	"github.com/wailsapp/wails/v2"
-	"github.com/wailsapp/wails/v2/pkg/options"
+	"git.restartfu.com/restart/gophig.git"
+	"log/slog"
+	"os"
+	"os/signal"
+	"syscall"
 )
 
-//go:embed all:frontend/dist
-var assets embed.FS
+func init() {
+	slog.SetLogLoggerLevel(slog.LevelInfo)
+}
 
-// The following program implements a proxy that forwards players from one local address to a remote address.
 func main() {
-	// Create an instance of the app structure
-	app := NewApp()
-
-	// Create application with options
-	err := wails.Run(&options.App{
-		Title:         "Tedac",
-		Width:         905,
-		Height:        525,
-		Frameless:     true,
-		DisableResize: true,
-		Assets:        assets,
-		OnStartup:     app.startup,
-		Bind:          []any{app},
-	})
-	if err != nil {
-		panic(err)
+	log := slog.Default()
+	goph := gophig.NewGophig[ProxyInfo]("./config.toml", gophig.TOMLMarshaler{}, os.ModePerm)
+	conf, err := goph.LoadConf()
+	if os.IsNotExist(err) {
+		_ = goph.SaveConf(ProxyInfo{
+			RemoteAddress: "127.0.0.1:19133",
+			LocalAddress:  "127.0.0.1:19132",
+		})
+	} else if err != nil {
+		log.Error("failed to connect to remote server: " + err.Error())
+		return
 	}
+
+	t := NewTedac(conf.LocalAddress)
+
+	log.Info("starting tedac...")
+	err = t.Connect(conf.RemoteAddress)
+	if err != nil {
+		log.Error("failed to connect to remote server: " + err.Error())
+		return
+	}
+
+	info, err := t.ProxyingInfo()
+	if err != nil {
+		log.Error("failed to retrieve proxy info: " + err.Error())
+		t.Terminate()
+		return
+	}
+	log.Info("started tedac", "local", info.LocalAddress, "remote", info.RemoteAddress)
+
+	c := make(chan os.Signal, 2)
+	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+	<-c
+
+	log.Info("terminating tedac...")
+	t.Terminate()
+	log.Info("tedac is offline.")
 }

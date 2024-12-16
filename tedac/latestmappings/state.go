@@ -2,7 +2,6 @@ package latestmappings
 
 import (
 	"bytes"
-	_ "embed"
 	"fmt"
 	"github.com/df-mc/worldupgrader/blockupgrader"
 	"github.com/sandertv/gophertunnel/minecraft/nbt"
@@ -11,6 +10,8 @@ import (
 	"sort"
 	"strings"
 	"unsafe"
+
+	_ "embed"
 )
 
 var (

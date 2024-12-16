@@ -5,24 +5,24 @@ import (
 	"time"
 )
 
-// discordID represents the Discord application ID of Tedac.
+// discordID ...
 const discordID = "710885082100924416"
 
-// startRPC starts the Discord Rich Presence module of Tedac.
-func (a *App) startRPC() {
+// startRPC ...
+func (t *Tedac) startRPC() {
 	err := client.Login(discordID)
 	if err != nil {
 		return
 	}
 
 	start := time.Now()
-	t := time.NewTicker(time.Second)
-	defer t.Stop()
+	tick := time.NewTicker(time.Second)
+	defer tick.Stop()
 	for {
 		select {
-		case <-t.C:
+		case <-tick.C:
 			err = client.SetActivity(client.Activity{
-				State:      a.remoteAddress,
+				State:      t.remoteAddress,
 				Details:    "Playing Minecraft: Bedrock Edition on 1.12",
 				LargeImage: "tedac",
 				LargeText:  "TedacMC",
@@ -35,7 +35,7 @@ func (a *App) startRPC() {
 			if err != nil {
 				return
 			}
-		case <-a.c:
+		case <-t.c:
 			return
 		}
 	}
